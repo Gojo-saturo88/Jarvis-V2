@@ -1,0 +1,35 @@
+<escape><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#07152d"/>
+<stop offset="100%" stop-color="#02050d"/>
+</linearGradient>
+<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0%" stop-color="#b8f8ff"/>
+<stop offset="45%" stop-color="#398dce"/>
+<stop offset="100%" stop-color="#12345d"/>
+</linearGradient>
+<linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+<stop stop-color="#00eaff"/>
+<stop offset="100%" stop-color="#4785ff"/>
+</linearGradient>
+<filter id="glow">
+<feGaussianBlur stdDeviation="7" result="blur"/>
+<feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+</filter>
+</defs>
+<rect width="512" height="512" rx="100" fill="url(#bg)"/>
+<circle cx="256" cy="222" r="166" fill="none" stroke="#123c64" stroke-width="3"/>
+<circle cx="256" cy="222" r="150" fill="none" stroke="url(#cyan)" stroke-width="8" stroke-dasharray="160 18 48 18" filter="url(#glow)"/>
+<circle cx="256" cy="222" r="130" fill="#071426" stroke="#24577d" stroke-width="3"/>
+<path d="M170 155 L210 125 L302 125 L342 155 L365 222 L343 291 L300 327 L212 327 L169 291 L147 222 Z" fill="url(#metal)" stroke="#8aefff" stroke-width="3"/>
+<path d="M194 164 L226 146 L286 146 L318 164 L337 219 L316 275 L286 302 L226 302 L196 275 L175 219 Z" fill="#091a30"/>
+<path d="M188 204 L226 187 L246 202 L239 227 L202 236 L185 224 Z" fill="url(#cyan)" filter="url(#glow)"/>
+<path d="M324 204 L286 187 L266 202 L273 227 L310 236 L327 224 Z" fill="url(#cyan)" filter="url(#glow)"/>
+<path d="M224 255 L256 270 L288 255 L278 285 L256 294 L234 285 Z" fill="#2c6b98" stroke="#72edff" stroke-width="3"/>
+<path d="M215 125 L230 106 L282 106 L297 125" fill="none" stroke="#8af5ff" stroke-width="5" stroke-linecap="round"/>
+<path d="M210 316 L210 337 M302 316 L302 337" stroke="#42dfff" stroke-width="5"/>
+<rect x="92" y="370" width="328" height="70" rx="18" fill="#08172a" stroke="#1b7398" stroke-width="2"/>
+<text x="256" y="401" fill="#e8fcff" font-family="Arial,sans-serif" font-size="31" font-weight="800" text-anchor="middle" letter-spacing="4">JARVIS 2.0</text>
+<text x="256" y="424" fill="#36dfff" font-family="Arial,sans-serif" font-size="11" font-weight="600" text-anchor="middle" letter-spacing="3">YOUR AI ASSISTANT</text>
+</svg></escape>
