@@ -316,6 +316,152 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
+
+/* ==========================================
+   JARVIS 2.0 — INTERNET SEARCH
+========================================== */
+
+function isNewsQuestion(q) {
+  return /\b(latest news|today'?s news|breaking news|current events|live news|news today|latest headlines)\b/i.test(q);
+}
+
+function isComplexQuestion(q) {
+  return /\b(explain in detail|step by step|solve|prove|derive|debug|write code|create an app|build a website|write an essay|detailed explanation|teach me|homework|maths problem|reasoning|analyze|analyse|compare in detail|make a project)\b/i.test(q)
+    || q.length > 180;
+}
+
+function googleSearchUrl(query) {
+  return "https://www.google.com/search?q=" + encodeURIComponent(query);
+}
+
+function cleanText(value) {
+  const div = document.createElement("div");
+  div.innerHTML = value || "";
+  return (div.textContent || "").trim();
+}
+
+async function webLookup(query) {
+  const api =
+    "https://en.wikipedia.org/w/api.php?action=query" +
+    "&list=search&srsearch=" + encodeURIComponent(query) +
+    "&utf8=1&format=json&origin=*&srlimit=5";
+
+  try {
+    const response = await fetch(api);
+
+    if (!response.ok) {
+      throw new Error("Search service unavailable");
+    }
+
+    const data = await response.json();
+    const results = data?.query?.search || [];
+
+    if (!results.length) {
+      const url = googleSearchUrl(query);
+
+      window.open(url, "_blank", "noopener,noreferrer");
+
+      return "I couldn't find a suitable quick result.\n\n" +
+        "Google Search opened for your question:\n" + url;
+    }
+
+    const lines = [
+      "INTERNET SEARCH RESULTS",
+      "Query: " + query,
+      ""
+    ];
+
+    results.forEach((item, index) => {
+      const url =
+        "https://en.wikipedia.org/?curid=" + item.pageid;
+
+      lines.push(
+        (index + 1) + ". " + cleanText(item.title),
+        cleanText(item.snippet.replace(/<\/?span[^>]*>/g, "")),
+        "Source: " + url,
+        ""
+      );
+    });
+
+    lines.push(
+      "More results: " + googleSearchUrl(query),
+      "",
+      "Note: These are Wikipedia search results, not a complete web-wide search."
+    );
+
+    return lines.join("\n");
+  } catch (error) {
+    const url = googleSearchUrl(query);
+
+    window.open(url, "_blank", "noopener,noreferrer");
+
+    return "The quick search service is unavailable right now.\n\n" +
+      "I've opened Google Search instead:\n" + url;
+  }
+}
+
+async function getLiveNews(query) {
+  const topic = query
+    .replace(/latest news|today'?s news|breaking news|live news|news today|latest headlines/ig, "")
+    .trim() || "India";
+
+  const rss =
+    "https://news.google.com/rss/search?q=" +
+    encodeURIComponent(topic + " when:7d") +
+    "&hl=en-IN&gl=IN&ceid=IN:en";
+
+  const api =
+    "https://api.rss2json.com/v1/api.json?rss_url=" +
+    encodeURIComponent(rss);
+
+  try {
+    const response = await fetch(api);
+
+    if (!response.ok) {
+      throw new Error("News feed unavailable");
+    }
+
+    const data = await response.json();
+    const items = (data.items || []).slice(0, 6);
+
+    if (!items.length) {
+      throw new Error("No news results");
+    }
+
+    const lines = [
+      "LATEST NEWS RESULTS",
+      "Topic: " + topic,
+      "Retrieved: " + new Date().toLocaleString(),
+      ""
+    ];
+
+    items.forEach((item, index) => {
+      lines.push(
+        (index + 1) + ". " + cleanText(item.title),
+        "Published: " + (item.pubDate || "Date unavailable"),
+        "Source: " + item.link,
+        ""
+      );
+    });
+
+    lines.push(
+      "More news: " + googleSearchUrl(topic + " latest news"),
+      "",
+      "Check each linked article for the full report and confirmation."
+    );
+
+    return lines.join("\n");
+  } catch (error) {
+    const url = googleSearchUrl(topic + " latest news");
+
+    window.open(url, "_blank", "noopener,noreferrer");
+
+    return "Live news feed could not be loaded.\n\n" +
+      "Search for current news here:\n" + url;
+  }
+}
+
+
 /* ==========================================
    Chat flow
 ========================================== */
