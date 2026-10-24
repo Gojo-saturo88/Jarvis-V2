@@ -1,21 +1,18 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Only the latest version on the `main` branch (the published site) receives fixes.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Please report security problems privately using GitHub's **Report a vulnerability** option on the repository's **Security** tab. Please do not post details in a public issue.
 
-Use this section to tell people how to report a vulnerability.
+Include what you found, how to reproduce it, and which browser or device you used. Reports are reviewed as time allows, and confirmed problems are fixed in `main`.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+## What this project does and does not store
+
+- Chats, settings and the theme stay in your own browser (localStorage). Nothing is stored on a server by this project.
+- The app contains no passwords, tokens or API keys. Never add any to this public repository.
+- AI replies are produced through Puter.js, and simple lookups (weather, exchange rates, dictionary, Wikipedia) are fetched directly from public services. Your question text is sent to those services to get an answer.
+- Replies are shown as escaped text with a small safe formatter. HTML previews run inside a sandboxed frame.

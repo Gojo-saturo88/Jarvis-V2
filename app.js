@@ -92,7 +92,8 @@ function renderMarkdown(input) {
 
   text = text.replace(/```([\w-]*)\n?([\s\S]*?)```/g, (_, language, code) => {
     const index = codeBlocks.length;
-    codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+    const lang = (language || "").toLowerCase();
+    codeBlocks.push(`<div class="code-block"><div class="code-head"><span>${escapeHTML(lang || "code")}</span><span><button data-action="copycode">Copy code</button>${lang === "html" ? '<button data-action="preview">Preview</button>' : ""}</span></div><pre><code>${code.trim()}</code></pre></div>`);
     return `@@JARVISCODE${index}@@`;
   });
 
@@ -108,8 +109,10 @@ function renderMarkdown(input) {
     return safe ? `<a href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>` : label;
   });
 
+  text = text.replace(/(^|\n)((?:<strong>)?Sources?:(?:<\/strong>)?[^\n]*)/g, '$1<div class="srcs">$2</div>');
   text = text.replace(/(^|\n)[ \t]*[-*] (.+)/g, "$1<li>$2</li>");
-  text = text.replace(/(?:<li>.*?<\/li>\n?)+/gs, block => `<ul>${block}</ul>`);
+  text = text.replace(/(?:<li>.*?<\/li>\n?)+/gs, block => `<ul>${block.replace(/\n/g, "")}</ul>`);
+  text = text.replace(/\n+(<div class="srcs">)/g, "$1");
   text = text.replace(/\n/g, "<br>");
 
   return text.replace(/@@JARVISCODE(\d+)@@/g, (_, index) => codeBlocks[Number(index)] || "");
@@ -167,24 +170,32 @@ function renderMessages() {
   welcome.classList.add("hidden");
   messagesBox.classList.remove("hidden");
 
+  const lastAssistant = [...chat.messages].reverse().find(m => m.role === "assistant");
+  const lastUser = [...chat.messages].reverse().find(m => m.role === "user");
+
   messagesBox.innerHTML = chat.messages.map(message => {
     const isUser = message.role === "user";
     const roleLabel = isUser ? "You" : "JARVIS";
     const avatar = isUser ? "Y" : "J";
     const content = renderMarkdown(message.content || "");
+    const time = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    const badge = message.src ? `<span class="src-badge">${message.src === "net" ? "🌐 Internet" : message.src === "mix" ? "🌐 + 🤖 Internet + AI" : "🤖 AI"}</span>` : "";
 
     let actions = "";
     if (!isUser) {
       actions = `<div class="message-actions">
         <button data-action="copy" data-id="${message.id}">Copy</button>
         <button data-action="speak" data-id="${message.id}">Read aloud</button>
+        ${message === lastAssistant && !busy ? `<button data-action="regen" data-id="${message.id}">Regenerate</button>` : ""}
       </div>`;
+    } else if (message === lastUser && !busy) {
+      actions = `<div class="message-actions"><button data-action="edit" data-id="${message.id}">Edit</button></div>`;
     }
 
     return `<article class="message ${isUser ? "user" : "assistant"}" data-message-id="${message.id}">
       <div class="message-avatar">${avatar}</div>
       <div class="message-main">
-        <div class="message-label">${roleLabel}</div>
+        <div class="message-label">${roleLabel}${badge}<time>${time}</time></div>
         <div class="message-content">${content}</div>
         ${actions}
       </div>
@@ -197,7 +208,8 @@ function renderMessages() {
 function renderHistory() {
   const list = $("#historyList");
 
-  list.innerHTML = chats.map(chat => `
+  const query = ($("#historySearch")?.value || "").toLowerCase();
+  list.innerHTML = chats.filter(chat => !query || String(chat.title).toLowerCase().includes(query)).map(chat => `
     <div class="history-item ${chat.id === activeChatId ? "active" : ""}">
       <button class="history-open" data-chat-id="${chat.id}" title="${escapeHTML(chat.title)}">
         ${escapeHTML(chat.title)}
@@ -308,7 +320,7 @@ function extractSources(text) {
 
 function buildSystemPrompt(webEnabled) {
   const webInstructions = webEnabled
-    ? `For this request, use the available web_search tool to find relevant and recent information. Analyze the search results before answering. Include direct source links in Markdown when available. Never invent sources or claim to have searched if you did not.`
+    ? `For this request, use the available web_search tool to find relevant and recent information. Analyze the search results before answering. Include direct source links in Markdown when available, and finish with one line that starts with "Sources:" followed by the links you used. Never invent sources or claim to have searched if you did not.`
     : `If the user asks about current information that may have changed, use web search if available. Be transparent when verification is not possible.`;
 
   return `You are JARVIS, a friendly, capable AI assistant.
@@ -321,7 +333,100 @@ Distinguish confirmed facts from guesses and acknowledge uncertainty.
 Never fabricate web results, citations, or tool usage.`;
 }
 
-async function askAI(question, history, useWeb) {
+/* ===== Internet-first engine: free public services first, AI only when needed ===== */
+async function fetchJSON(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  return response.json();
+}
+
+const WEATHER_CODES = { 0: "Clear sky", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 45: "Fog", 48: "Fog", 51: "Light drizzle", 53: "Drizzle", 55: "Heavy drizzle", 61: "Light rain", 63: "Rain", 65: "Heavy rain", 71: "Light snow", 73: "Snow", 75: "Heavy snow", 80: "Rain showers", 81: "Rain showers", 82: "Heavy showers", 95: "Thunderstorm", 96: "Thunderstorm with hail", 99: "Thunderstorm with hail" };
+
+function calcAnswer(text) {
+  let e = text.toLowerCase()
+    .replace(/(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)/g, "($1/100*$2)")
+    .replace(/\^/g, "**").replace(/[x\u00d7]/g, "*").replace(/\u00f7/g, "/").replace(/,/g, "");
+  e = e.replace(/^(what is|what's|calculate|solve|compute|kitna hota hai)\s+/, "").replace(/[=?]+$/, "").trim();
+  if (!/^[\d+\-*/().%\s]+$/.test(e) || !/\d/.test(e) || !/[+\-*/%]/.test(e)) return null;
+  try {
+    const value = Function('"use strict";return (' + e + ")")();
+    return typeof value === "number" && isFinite(value) ? Math.round(value * 1e10) / 1e10 : null;
+  } catch { return null; }
+}
+
+async function weatherAnswer(text) {
+  if (!/(weather|mausam|temperature|barish)/i.test(text)) return null;
+  const clean = text.replace(/[?!.]+$/, "");
+  let city = (/\b(?:in|at|of|for)\s+([a-z\s.-]{2,40})$/i.exec(clean) || /([a-z\s.-]{2,40})\s+(?:ka|ki|me|mein)\s+(?:mausam|weather|temperature)/i.exec(clean) || [])[1];
+  if (!city) return null;
+  city = city.replace(/\b(today|now|right now|aaj|abhi)\b/ig, "").trim();
+  const geo = await fetchJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&name=" + encodeURIComponent(city));
+  const place = geo.results && geo.results[0];
+  if (!place) return null;
+  const w = await fetchJSON("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1");
+  const now = w.current, day = w.daily;
+  return { text: "**Weather in " + place.name + (place.country ? ", " + place.country : "") + "**\n\n- Now: " + now.temperature_2m + "\u00b0C, " + (WEATHER_CODES[now.weather_code] || "") + "\n- Humidity: " + now.relative_humidity_2m + "%\n- Wind: " + now.wind_speed_10m + " km/h\n- Today: " + day.temperature_2m_min[0] + "\u00b0C to " + day.temperature_2m_max[0] + "\u00b0C\n\nSources: [Open-Meteo](https://open-meteo.com)" };
+}
+
+async function currencyAnswer(text) {
+  const m = /(\d+(?:\.\d+)?)\s*([a-z]{3})\s*(?:to|in|into)\s*([a-z]{3})\b/i.exec(text);
+  if (!m) return null;
+  const amount = +m[1], from = m[2].toUpperCase(), to = m[3].toUpperCase();
+  const data = await fetchJSON("https://open.er-api.com/v6/latest/" + from);
+  const rate = data.rates && data.rates[to];
+  if (!rate) return null;
+  return { text: "**" + amount + " " + from + " = " + (amount * rate).toFixed(2) + " " + to + "**\n\nRate: 1 " + from + " = " + rate + " " + to + "\n\nSources: [ExchangeRate-API](https://www.exchangerate-api.com)" };
+}
+
+async function dictionaryAnswer(text) {
+  const t = text.trim();
+  const m = /^(?:meaning of|define|definition of)\s+([a-z'-]+)\??$/i.exec(t) || /^what does ([a-z'-]+) mean\??$/i.exec(t) || /^([a-z'-]+)\s+(?:ka\s+)?meaning\??$/i.exec(t);
+  if (!m) return null;
+  const data = await fetchJSON("https://api.dictionaryapi.dev/api/v2/entries/en/" + encodeURIComponent(m[1]));
+  const entry = data && data[0];
+  if (!entry) return null;
+  return { text: "**" + entry.word + "**" + (entry.phonetic ? " " + entry.phonetic : "") + "\n\n" + entry.meanings.slice(0, 3).map(x => "- *" + x.partOfSpeech + "*: " + ((x.definitions[0] || {}).definition || "")).join("\n") + "\n\nSources: [dictionaryapi.dev](https://dictionaryapi.dev)" };
+}
+
+async function wikiSources(text, hindi) {
+  const topic = text.replace(/[?!.]+$/, "").replace(/^(who is|who was|what is|what are|tell me about|explain|about)\s+/i, "").replace(/\s+(kaun hai|kaun tha|kya hai|kya hota hai)$/i, "").trim();
+  if (!topic || topic.length > 80) return [];
+  const base = hindi ? "https://hi.wikipedia.org" : "https://en.wikipedia.org";
+  const found = await fetchJSON(base + "/w/api.php?action=query&list=search&format=json&origin=*&srlimit=3&srsearch=" + encodeURIComponent(topic));
+  const hits = ((found.query && found.query.search) || []).slice(0, 3);
+  const pages = await Promise.all(hits.map(hit =>
+    fetchJSON(base + "/api/rest_v1/page/summary/" + encodeURIComponent(hit.title.replace(/ /g, "_")))
+      .then(p => p.extract ? { title: p.title, extract: p.extract.slice(0, 700), url: (p.content_urls && p.content_urls.desktop && p.content_urls.desktop.page) || base + "/wiki/" + encodeURIComponent(hit.title) } : null)
+      .catch(() => null)));
+  return pages.filter(Boolean);
+}
+
+async function netAnswer(text) {
+  const t = text.trim();
+  if (!t || t.length > 200) return null;
+  const calc = calcAnswer(t);
+  if (calc !== null) return { text: "**" + calc + "**\n\n(calculated on your device)" };
+  for (const fn of [weatherAnswer, currencyAnswer, dictionaryAnswer]) {
+    try { const result = await fn(t); if (result) return result; } catch { /* try the next source */ }
+  }
+  const u = t.replace(/[?!.\s]+$/, "");
+  const info = /^(who is|who was|what is|what are|tell me about|about)\s+\S/i.test(u) || /\s(kaun hai|kaun tha|kya hai|kya hota hai)$/i.test(u);
+  const why = /\b(why|how|explain|compare|difference|vs|kaise|kyun|kyon|samjha\w*|summari[sz]e)\b/i.test(u);
+  const aboutMe = /\b(you|your|yours|jarvis|my|mera|meri|tum|tumhara|aap)\b/i.test(u);
+  if ((info || why) && !aboutMe && (why || u.split(/\s+/).length <= 8)) {
+    try {
+      const pages = await wikiSources(u, /[\u0900-\u097F]/.test(u));
+      if (pages.length) {
+        const context = pages.map((p, i) => "[" + (i + 1) + "] " + p.title + " - " + p.url + "\n" + p.extract).join("\n\n");
+        const fallback = "**" + pages[0].title + "**\n\n" + pages[0].extract + "\n\nSources: " + pages.map((p, i) => "[" + (i + 1) + " " + p.title + "](" + p.url + ")").join(" ");
+        return { context, fallback: why ? null : fallback };
+      }
+    } catch { /* fall back to AI */ }
+  }
+  return null;
+}
+
+async function askAI(question, history, useWeb, opts = {}) {
   if (!navigator.onLine) {
     throw new Error("Internet connection nahi hai. Connect karke dobara try karo.");
   }
@@ -347,7 +452,20 @@ async function askAI(question, history, useWeb) {
   let response;
 
   try {
-    response = await puter.ai.chat(messages, options);
+    if (!useWeb && typeof opts.onText === "function") {
+      const stream = await puter.ai.chat(messages, { model: options.model, stream: true });
+      if (stream && stream[Symbol.asyncIterator]) {
+        let acc = "";
+        for await (const part of stream) {
+          if (part && part.text) { acc += part.text; opts.onText(acc); }
+        }
+        response = { message: { content: acc } };
+      } else {
+        response = stream;
+      }
+    } else {
+      response = await puter.ai.chat(messages, options);
+    }
   } catch (firstError) {
     // If the requested model/tool combination is not supported,
     // retry without forcing the web tool. Do not pretend web search worked.
@@ -398,6 +516,44 @@ function tryLocalCommand(question) {
   return null;
 }
 
+function removeLastExchange() {
+  const chat = currentChat();
+  if (!chat) return null;
+  while (chat.messages.length && chat.messages[chat.messages.length - 1].role === "assistant") chat.messages.pop();
+  const lastUser = chat.messages.pop();
+  saveChats();
+  renderAll();
+  return lastUser || null;
+}
+
+function regenerateLast() {
+  if (busy) return;
+  const lastUser = removeLastExchange();
+  if (!lastUser) return;
+  $("#promptInput").value = lastUser.content;
+  processMessage();
+}
+
+function editLast() {
+  if (busy) return;
+  const lastUser = removeLastExchange();
+  if (!lastUser) return;
+  const input = $("#promptInput");
+  input.value = lastUser.content;
+  autoResizeInput();
+  input.focus();
+}
+
+function openPreview(html) {
+  $("#previewFrame").srcdoc = html;
+  $("#previewModal").classList.remove("hidden");
+}
+
+function closePreview() {
+  $("#previewModal").classList.add("hidden");
+  $("#previewFrame").srcdoc = "";
+}
+
 async function processMessage() {
   if (busy) return;
 
@@ -426,6 +582,7 @@ async function processMessage() {
   addMessage("user", question);
 
   busy = true;
+  const forcedWeb = forceWebSearch;
   const useWeb = forceWebSearch || isLikelyCurrentInfo(question);
   const wasStudyMode = studyMode;
 
@@ -440,17 +597,68 @@ async function processMessage() {
     prompt = `Help me learn this step by step in a student-friendly way: ${question}`;
   }
 
+  let live = null;
+  let hit = null;
+
   try {
-    const result = await askAI(prompt, priorHistory, useWeb);
-    addMessage("assistant", result.answer, { sources: result.sources });
+    if (!wasStudyMode && !forcedWeb) {
+      try { hit = await netAnswer(question); } catch { hit = null; }
+    }
+
+    if (hit && hit.text) {
+      addMessage("assistant", hit.text, { src: "net" });
+      if (voiceReplies) speakText(hit.text);
+      return;
+    }
+
+    let aiPrompt = prompt;
+    if (hit && hit.context) {
+      aiPrompt = "Write a clear, well-organised final answer to the QUESTION using the numbered internet sources below. Stay accurate and do not invent facts that are not supported. Cite inline like [1], and finish with one line that starts with 'Sources:' followed by markdown links, for example [1 Title](url) [2 Title](url). If the sources are not relevant, answer normally.\n\nSOURCES:\n" + hit.context + "\n\nQUESTION: " + question;
+    }
+
+    const srcTag = (hit && hit.context) || useWeb ? "mix" : "ai";
+    const onText = text => {
+      if (!live) {
+        $("#thinking").classList.add("hidden");
+        live = addMessage("assistant", text, { src: srcTag });
+      } else {
+        live.content = text;
+        const el = document.querySelector(`[data-message-id="${live.id}"] .message-content`);
+        if (el) {
+          el.innerHTML = renderMarkdown(text);
+          $("#chatArea").scrollTop = $("#chatArea").scrollHeight;
+        }
+      }
+    };
+
+    const result = await askAI(aiPrompt, priorHistory, useWeb, { onText });
+
+    if (live) {
+      live.content = result.answer;
+      live.sources = result.sources;
+      saveChats();
+    } else {
+      addMessage("assistant", result.answer, { sources: result.sources, src: srcTag });
+    }
     if (voiceReplies) speakText(result.answer);
   } catch (error) {
     console.error("JARVIS request failed:", error);
+    const chatNow = currentChat();
+    if (live && chatNow) {
+      chatNow.messages = chatNow.messages.filter(m => m !== live);
+      saveChats();
+    }
+    if (hit && hit.fallback) {
+      addMessage("assistant", hit.fallback, { src: "net" });
+      showToast("AI was unavailable, so JARVIS showed the Wikipedia sources directly.");
+      return;
+    }
     const reason = error?.message || "Unknown error";
     showError(`JARVIS could not complete this request. ${reason} Check your connection or try again later.`);
   } finally {
     busy = false;
     setThinking(false);
+    renderMessages();
     input.disabled = false;
     $("#sendBtn").disabled = false;
     input.focus();
@@ -688,13 +896,25 @@ $("#messages").addEventListener("click", event => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
 
+  const action = button.dataset.action;
+  const block = button.closest(".code-block");
+
+  if (action === "copycode" && block) { copyText(block.querySelector("code").textContent); return; }
+  if (action === "preview" && block) { openPreview(block.querySelector("code").textContent); return; }
+  if (action === "regen") { regenerateLast(); return; }
+  if (action === "edit") { editLast(); return; }
+
   const chat = currentChat();
   const message = chat?.messages.find(item => item.id === button.dataset.id);
   if (!message) return;
 
-  if (button.dataset.action === "copy") copyText(message.content);
-  if (button.dataset.action === "speak") speakText(message.content);
+  if (action === "copy") copyText(message.content);
+  if (action === "speak") speakText(message.content);
 });
+
+$("#historySearch").addEventListener("input", renderHistory);
+$("#closePreview").addEventListener("click", closePreview);
+$("#previewModal").addEventListener("click", event => { if (event.target.id === "previewModal") closePreview(); });
 
 document.querySelectorAll("[data-prompt]").forEach(button => {
   button.addEventListener("click", () => {
@@ -715,6 +935,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.key === "Escape") {
     closeSettings();
+    closePreview();
     closeMenus();
     closeSidebarOnMobile();
   }
@@ -722,6 +943,10 @@ document.addEventListener("keydown", event => {
 
 window.addEventListener("online", updateConnectionStatus);
 window.addEventListener("offline", updateConnectionStatus);
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+}
 
 setTheme(localStorage.getItem(THEME_KEY) || "light");
 setVoiceReplies(voiceReplies);

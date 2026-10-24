@@ -255,3 +255,18 @@ button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent);
   .model-pill { display: none; }
   .tool-btn > span:nth-child(2) { display: none; }
 }
+
+
+/* ===== Upgrade: sources, code blocks, preview, search ===== */
+.src-badge { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 10px; }
+.message-label time { margin-left: 8px; opacity: .7; }
+.srcs { margin-top: 12px; }
+.srcs a { display: inline-block; margin: 3px 6px 3px 0; padding: 1px 11px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--accent); font-size: 12px; text-decoration: none; }
+.code-block { margin: 10px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+.code-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 4px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+.code-head button { border: 0; background: transparent; color: var(--accent); font-size: 11px; padding: 4px 7px; border-radius: 6px; }
+.code-head button:hover { background: var(--accent-soft); }
+.code-block pre { margin: 0; border: 0; border-radius: 0; }
+.history-search { width: calc(100% - 18px); margin: 0 9px 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); color: var(--text); font: inherit; font-size: 12px; }
+.preview-modal { width: min(920px, 100%); height: 82dvh; display: flex; flex-direction: column; }
+.preview-modal iframe { flex: 1; width: 100%; border: 1px solid var(--border); border-radius: 10px; background: #fff; }

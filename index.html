@@ -8,6 +8,8 @@
   <meta name="description" content="JARVIS AI — your intelligent assistant">
   <title>JARVIS AI</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <script src="https://js.puter.com/v2/"></script>
 </head>
@@ -43,6 +45,7 @@
         <span>RECENT CHATS</span>
         <button class="tiny-btn" id="clearHistory" title="Clear history">•••</button>
       </div>
+      <input type="search" id="historySearch" class="history-search" placeholder="Search chats" aria-label="Search chats">
       <div id="historyList" class="history-list"></div>
 
       <div class="sidebar-bottom">
@@ -172,6 +175,13 @@
         <p>Web search uses the supported Puter AI search tool when available. Internet access and service availability are required.</p>
       </div>
       <div class="modal-foot"><button class="primary-btn" id="doneSettings">Done</button></div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop hidden" id="previewModal">
+    <section class="settings-modal preview-modal" role="dialog" aria-modal="true" aria-label="HTML preview">
+      <div class="modal-head"><h2>Preview</h2><button class="icon-btn" id="closePreview" aria-label="Close preview">×</button></div>
+      <iframe id="previewFrame" title="HTML preview" sandbox="allow-scripts"></iframe>
     </section>
   </div>
 

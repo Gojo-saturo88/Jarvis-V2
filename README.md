@@ -1,63 +1,54 @@
 # Jarvis-V2
 JARVIS 2.0 — Your AI Assistant
 
-A futuristic, mobile-friendly AI assistant built with HTML, CSS, and JavaScript.
+A mobile-friendly AI assistant built with HTML, CSS and JavaScript. AI runs through Puter.js, with no server and no API key.
 
-Features
+## Features
+- Clean light/dark interface with sidebar, chat history, chat search and Settings
+- **Internet-first answers:** calculator, weather (Open-Meteo), exchange rates, word meanings and Wikipedia sources are fetched directly. AI is used when real thinking is needed.
+- **Finalized answers with links:** for "who is / what is / why / how" questions, JARVIS gathers up to 3 Wikipedia sources and the AI writes one organised answer. The reply ends with clickable source buttons. If the AI is unavailable, the sources are still shown.
+- Web search mode for news and current information, also ending with a Sources line
+- Every answer is labelled: Internet, Internet + AI, or AI
+- Streaming replies, Regenerate, Edit your last question, Copy, Read aloud
+- Code blocks with Copy code, and a sandboxed Preview for HTML
+- Study assistant, voice input and spoken replies (where the browser supports them)
+- Export conversation, clear chat, clear history
+- PWA: installable, with an offline app shell (registered service worker)
 
-- Futuristic JARVIS-inspired interface
-- AI chat powered by Puter.js
-- Voice input and text-to-speech where supported
-- Student study assistant and quick actions
-- Chat history saved in your browser
-- Responsive mobile and desktop design
-- PWA installation support
-- Basic offline shell caching
-
-Project Structure
-
-JARVIS-2.0/
+## Project structure
+```
+Jarvis-V2/
 ├── index.html
 ├── style.css
 ├── app.js
 ├── manifest.json
 ├── service-worker.js
+├── SECURITY.md
 ├── README.md
+├── .github/workflows/codeql.yml
 └── assets/
-    └── icon.svg
+    ├── icon.svg
+    ├── icon-192.png
+    ├── icon-512.png
+    └── icon-maskable-512.png
+```
 
-How to Run
+## Run / deploy (GitHub Pages)
+1. Repository **Settings → Pages**
+2. **Deploy from a branch**, branch `main`, folder `/ (root)`
+3. Open the published URL. All paths are relative, so it works inside the `/Jarvis-V2/` folder.
 
-1. Open the deployed website in a supported browser.
-2. Connect to the internet for AI features.
-3. Allow microphone access if you want to use voice input.
-4. Start chatting with JARVIS.
+## Data and privacy
+- Chats and settings are stored only in your browser.
+- Questions are sent to Puter (AI) or to public services (Open-Meteo, ExchangeRate-API, dictionaryapi.dev, Wikipedia) to get answers.
+- Voice input uses your browser's speech service, which may process audio online.
+- Do not store passwords, API keys or private information in this public repository.
 
-Deployment
-
-You can host this project using GitHub Pages or Vercel.
-
-For GitHub Pages:
-
-1. Open repository Settings.
-2. Select Pages.
-3. Choose Deploy from a branch.
-4. Select the "main" branch and "/ (root)".
-5. Save and open the published URL after deployment completes.
-
-Important Notes
-
-- AI features require internet access and a working Puter.js session.
+## Known limitations
+- AI features need internet and a working Puter.js session.
+- Internet lookups work best in English (Hindi Wikipedia is used for Devanagari text).
 - Voice features depend on browser support and permissions.
-- Offline caching does not mean the AI itself works offline.
-- Chat history is stored locally in the browser.
-- Do not store passwords, API keys, or sensitive information in this public repository.
+- Offline mode only keeps the app shell. The AI does not work offline.
 
-Built With
-
-- HTML5
-- CSS3
-- JavaScript
-- Puter.js
-
-JARVIS 2.0 — Your AI, Your Workspace.
+## Built with
+HTML5, CSS3, JavaScript, Puter.js
