@@ -6,6 +6,7 @@ const $ = (selector) => document.querySelector(selector);
 const STORAGE_KEY = "jarvis-v2-chats";
 const THEME_KEY = "jarvis-v2-theme";
 const VOICE_KEY = "jarvis-v2-voice";
+const INTERNET_KEY = "jarvis-v2-internet-first";
 
 let chats = loadChats();
 let activeChatId = chats[0]?.id || null;
@@ -179,7 +180,7 @@ function renderMessages() {
     const avatar = isUser ? "Y" : "J";
     const content = renderMarkdown(message.content || "");
     const time = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-    const badge = message.src ? `<span class="src-badge">${message.src === "net" ? "🌐 Internet" : message.src === "mix" ? "🌐 + 🤖 Internet + AI" : "🤖 AI"}</span>` : "";
+    const badge = message.src ? `<span class="src-badge">${message.src === "local" ? "⚙️ On your device" : message.src === "net" ? "🌐 Internet" : message.src === "mix" ? "🌐 + 🤖 Internet + AI" : "🤖 AI"}</span>` : "";
 
     let actions = "";
     if (!isUser) {
@@ -310,7 +311,7 @@ function showError(message) {
 }
 
 function isLikelyCurrentInfo(question) {
-  return /\b(latest|today|current|currently|recent|news|weather|price|prices|score|stock|202[5-9]|this week|yesterday|tomorrow|release date|version)\b/i.test(question);
+  return /\b(latest|today|tonight|now|current|currently|recent|recently|news|weather|price|prices|rate|score|stock|202[5-9]|this week|this year|yesterday|tomorrow|release|released|launch|launched|version|update|updated|new|newest|president|prime minister|pm|chief minister|cm|minister|ceo|captain|coach|champion|winner|won|result|results|ranking|richest|population|trending|live|aaj|abhi|taaza|naya|nayi|khabar)\b/i.test(question);
 }
 
 function extractSources(text) {
@@ -324,6 +325,7 @@ function buildSystemPrompt(webEnabled) {
     : `If the user asks about current information that may have changed, use web search if available. Be transparent when verification is not possible.`;
 
   return `You are JARVIS, a friendly, capable AI assistant.
+Today's date is ${new Date().toLocaleDateString("en-GB", { dateStyle: "full" })}. Your built-in knowledge has a cutoff and may be outdated, so for anything that can change (office holders, news, prices, sports, versions, events) rely on web search results or the supplied sources, not memory, and say when you could not verify something.
 ${webInstructions}
 Answer in the language used by the user unless asked otherwise.
 Use clear formatting, practical steps, and examples where helpful.
@@ -401,11 +403,11 @@ async function wikiSources(text, hindi) {
   return pages.filter(Boolean);
 }
 
-async function netAnswer(text) {
+async function netAnswer(text, skipWiki = false) {
   const t = text.trim();
   if (!t || t.length > 200) return null;
   const calc = calcAnswer(t);
-  if (calc !== null) return { text: "**" + calc + "**\n\n(calculated on your device)" };
+  if (calc !== null) return { text: "**" + calc + "**\n\n(calculated on your device)", local: true };
   for (const fn of [weatherAnswer, currencyAnswer, dictionaryAnswer]) {
     try { const result = await fn(t); if (result) return result; } catch { /* try the next source */ }
   }
@@ -413,7 +415,7 @@ async function netAnswer(text) {
   const info = /^(who is|who was|what is|what are|tell me about|about)\s+\S/i.test(u) || /\s(kaun hai|kaun tha|kya hai|kya hota hai)$/i.test(u);
   const why = /\b(why|how|explain|compare|difference|vs|kaise|kyun|kyon|samjha\w*|summari[sz]e)\b/i.test(u);
   const aboutMe = /\b(you|your|yours|jarvis|my|mera|meri|tum|tumhara|aap)\b/i.test(u);
-  if ((info || why) && !aboutMe && (why || u.split(/\s+/).length <= 8)) {
+  if (!skipWiki && (info || why) && !aboutMe && (why || u.split(/\s+/).length <= 8)) {
     try {
       const pages = await wikiSources(u, /[\u0900-\u097F]/.test(u));
       if (pages.length) {
@@ -424,6 +426,39 @@ async function netAnswer(text) {
     } catch { /* fall back to AI */ }
   }
   return null;
+}
+
+const AI_MODEL = "openai/gpt-5.6-luna";
+
+/* ===== Internet-first policy: nearly every question is answered from the web ===== */
+function internetFirstOn() {
+  return localStorage.getItem(INTERNET_KEY) !== "false";
+}
+
+/* Only these stay AI-only: greetings, creative/code writing, translation and rewriting. */
+function wantsInternet(question) {
+  const t = question.trim().toLowerCase();
+  if (t.length < 3) return false;
+  if (t.split(/\s+/).length <= 5 && /^(hi+|hello|hey|yo|thanks?|thank you|ok(ay)?|bye|good (morning|night|evening|afternoon)|namaste|how are you|kaise ho|shukriya|dhanyavad)\b/.test(t)) return false;
+  if (/\b(write|create|make|generate|build|draft|compose|code)\b.*\b(poem|story|essay|letter|email|song|joke|caption|code|program|script|function|website|webpage|html|css|app|game|bio|speech)\b/.test(t)) return false;
+  if (/\b(translate|rewrite|paraphrase|proofread|fix (my )?grammar|improve this)\b/.test(t)) return false;
+  return true;
+}
+
+function topicFrom(question) {
+  return question.replace(/[?!.]+$/, "")
+    .replace(/\b(please|current|currently|latest|now|today|right now|who is the|who is|who was|what is the|what is|what are|tell me about|explain|kaun hai|kaun tha|kya hai|kya hota hai)\b/gi, " ")
+    .replace(/\s+/g, " ").trim();
+}
+
+function internetStats() {
+  const answers = chats.flatMap(chat => chat.messages).filter(m => m.role === "assistant" && m.src);
+  if (!answers.length) return "No answers yet. Ask a few questions to see how much JARVIS used the internet.";
+  const net = answers.filter(m => m.src === "net").length;
+  const mix = answers.filter(m => m.src === "mix").length;
+  const ai = answers.filter(m => m.src === "ai").length;
+  const local = answers.filter(m => m.src === "local").length;
+  return `${Math.round((net + mix) / answers.length * 100)}% of your answers used the internet (${net} internet only, ${mix} internet + AI, ${ai} AI only, ${local} calculated on your device).`;
 }
 
 async function askAI(question, history, useWeb, opts = {}) {
@@ -445,18 +480,20 @@ async function askAI(question, history, useWeb, opts = {}) {
   ];
 
   const options = {
-    model: "gpt-4o-mini",
+    model: AI_MODEL,
     tools: [{ type: "web_search" }]
   };
 
   let response;
+  let searched = useWeb;
 
   try {
     if (!useWeb && typeof opts.onText === "function") {
-      const stream = await puter.ai.chat(messages, { model: options.model, stream: true });
+      const stream = await puter.ai.chat(messages, { model: AI_MODEL, stream: true });
       if (stream && stream[Symbol.asyncIterator]) {
         let acc = "";
         for await (const part of stream) {
+          if (part && part.type === "error") throw new Error(part.message || "The AI stream failed.");
           if (part && part.text) { acc += part.text; opts.onText(acc); }
         }
         response = { message: { content: acc } };
@@ -469,11 +506,10 @@ async function askAI(question, history, useWeb, opts = {}) {
   } catch (firstError) {
     // If the requested model/tool combination is not supported,
     // retry without forcing the web tool. Do not pretend web search worked.
-    if (!useWeb) throw firstError;
-
     try {
-      response = await puter.ai.chat(messages, { model: "gpt-4o-mini" });
-      showToast("Search tool unavailable; AI answered without guaranteed live search.");
+      response = await puter.ai.chat(messages, {});
+      searched = false;
+      if (useWeb) showToast("Live search was unavailable, so this answer may be out of date.");
     } catch {
       throw firstError;
     }
@@ -482,9 +518,12 @@ async function askAI(question, history, useWeb, opts = {}) {
   const answer = normalizeAIResponse(response);
   if (!answer) throw new Error("AI ne readable answer nahi diya. Dobara try karo.");
 
+  const note = useWeb && !searched ? "\n\n*Live web search was unavailable, so this answer may be out of date.*" : "";
+
   return {
-    answer,
-    sources: extractSources(answer)
+    answer: answer + note,
+    sources: extractSources(answer),
+    searched
   };
 }
 
@@ -583,7 +622,8 @@ async function processMessage() {
 
   busy = true;
   const forcedWeb = forceWebSearch;
-  const useWeb = forceWebSearch || isLikelyCurrentInfo(question);
+  const internetOn = internetFirstOn() && wantsInternet(question);
+  const useWeb = forceWebSearch || isLikelyCurrentInfo(question) || internetOn;
   const wasStudyMode = studyMode;
 
   setThinking(true, useWeb);
@@ -599,24 +639,41 @@ async function processMessage() {
 
   let live = null;
   let hit = null;
+  let pages = [];
+  let links = [];
+  let context = "";
+  let fallbackText = null;
 
   try {
     if (!wasStudyMode && !forcedWeb) {
-      try { hit = await netAnswer(question); } catch { hit = null; }
+      try { hit = await netAnswer(question, internetOn || isLikelyCurrentInfo(question)); } catch { hit = null; }
     }
 
     if (hit && hit.text) {
-      addMessage("assistant", hit.text, { src: "net" });
+      addMessage("assistant", hit.text, { src: hit.local ? "local" : "net" });
       if (voiceReplies) speakText(hit.text);
       return;
     }
 
-    let aiPrompt = prompt;
-    if (hit && hit.context) {
-      aiPrompt = "Write a clear, well-organised final answer to the QUESTION using the numbered internet sources below. Stay accurate and do not invent facts that are not supported. Cite inline like [1], and finish with one line that starts with 'Sources:' followed by markdown links, for example [1 Title](url) [2 Title](url). If the sources are not relevant, answer normally.\n\nSOURCES:\n" + hit.context + "\n\nQUESTION: " + question;
+    context = (hit && hit.context) || "";
+    fallbackText = (hit && hit.fallback) || null;
+
+    if (internetOn && !context) {
+      try { pages = await wikiSources(topicFrom(question), /[\u0900-\u097F]/.test(question)); } catch { pages = []; }
+      if (pages.length) {
+        links = pages.map((p, i) => "[" + (i + 1) + " " + p.title + "](" + p.url + ")");
+        context = pages.map((p, i) => "[" + (i + 1) + "] " + p.title + " - " + p.url + "\n" + p.extract).join("\n\n");
+        fallbackText = "**" + pages[0].title + "**\n\n" + pages[0].extract + "\n\nSources: " + links.join(" ");
+      }
     }
 
-    const srcTag = (hit && hit.context) || useWeb ? "mix" : "ai";
+    let aiPrompt = prompt;
+    if (context) {
+      aiPrompt = "Write a clear, well-organised final answer to the QUESTION. Base it on the numbered internet sources below and on live web search results when you have that tool. Stay accurate and do not invent facts. Cite inline like [1], and finish with one line that starts with 'Sources:' followed by markdown links, for example [1 Title](url) [2 Title](url). If the sources are not relevant, rely on web search instead.\n\nSOURCES:\n" + context + "\n\nQUESTION: " + question;
+    }
+
+    const srcTag = context || useWeb ? "mix" : "ai";
+    let finalSrc = srcTag;
     const onText = text => {
       if (!live) {
         $("#thinking").classList.add("hidden");
@@ -633,12 +690,16 @@ async function processMessage() {
 
     const result = await askAI(aiPrompt, priorHistory, useWeb, { onText });
 
+    if (links.length && !/sources?:/i.test(result.answer)) result.answer += "\n\nSources: " + links.join(" ");
+    if (useWeb && !context && !result.searched) finalSrc = "ai";
+
     if (live) {
       live.content = result.answer;
       live.sources = result.sources;
+      live.src = finalSrc;
       saveChats();
     } else {
-      addMessage("assistant", result.answer, { sources: result.sources, src: srcTag });
+      addMessage("assistant", result.answer, { sources: result.sources, src: finalSrc });
     }
     if (voiceReplies) speakText(result.answer);
   } catch (error) {
@@ -648,8 +709,8 @@ async function processMessage() {
       chatNow.messages = chatNow.messages.filter(m => m !== live);
       saveChats();
     }
-    if (hit && hit.fallback) {
-      addMessage("assistant", hit.fallback, { src: "net" });
+    if (fallbackText) {
+      addMessage("assistant", fallbackText, { src: "net" });
       showToast("AI was unavailable, so JARVIS showed the Wikipedia sources directly.");
       return;
     }
@@ -792,6 +853,8 @@ function fallbackCopy(text) {
 function openSettings() {
   $("#modalBackdrop").classList.remove("hidden");
   $("#voiceSetting").checked = voiceReplies;
+  $("#internetSetting").checked = internetFirstOn();
+  $("#netStats").textContent = internetStats();
   document.querySelectorAll(".theme-option").forEach(button => {
     button.classList.toggle("active", button.dataset.theme === (document.body.classList.contains("dark-mode") ? "dark" : "light"));
   });
@@ -835,6 +898,10 @@ document.querySelectorAll(".theme-option").forEach(button => {
 });
 
 $("#voiceSetting").addEventListener("change", event => setVoiceReplies(event.target.checked));
+$("#internetSetting").addEventListener("change", event => {
+  localStorage.setItem(INTERNET_KEY, event.target.checked ? "true" : "false");
+  showToast(event.target.checked ? "Internet-first mode on." : "Internet-first mode off.");
+});
 
 $("#webMode").addEventListener("click", () => {
   forceWebSearch = !forceWebSearch;
