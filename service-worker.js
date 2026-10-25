@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "jarvis-2-shell-v2";
+const CACHE_NAME = "jarvis-2-shell-v4";
 
 const APP_FILES = [
   "./",

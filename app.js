@@ -180,7 +180,7 @@ function renderMessages() {
     const avatar = isUser ? "Y" : "J";
     const content = renderMarkdown(message.content || "");
     const time = message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-    const badge = message.src ? `<span class="src-badge">${message.src === "local" ? "⚙️ On your device" : message.src === "net" ? "🌐 Internet" : message.src === "mix" ? "🌐 + 🤖 Internet + AI" : "🤖 AI"}</span>` : "";
+    const badge = message.src ? `<span class="src-badge">${message.src === "local" ? "On your device" : message.src === "net" ? "Internet" : message.src === "mix" ? "Internet + AI" : "AI"}</span>` : "";
 
     let actions = "";
     if (!isUser) {
@@ -202,6 +202,8 @@ function renderMessages() {
       </div>
     </article>`;
   }).join("");
+
+  decorateSources(messagesBox);
 
   $("#chatArea").scrollTop = $("#chatArea").scrollHeight;
 }
@@ -593,6 +595,32 @@ function closePreview() {
   $("#previewFrame").srcdoc = "";
 }
 
+function decorateSources(root) {
+  root.querySelectorAll(".srcs a").forEach(link => {
+    if (link.querySelector("img")) return;
+    let host;
+    try { host = new URL(link.href).hostname; } catch { return; }
+
+    const logo = document.createElement("img");
+    logo.className = "src-logo";
+    logo.alt = "";
+    logo.width = 16;
+    logo.height = 16;
+    logo.loading = "lazy";
+    logo.referrerPolicy = "no-referrer";
+
+    let attempt = 0;
+    logo.addEventListener("error", () => {
+      attempt += 1;
+      if (attempt === 1) logo.src = "https://www.google.com/s2/favicons?domain=" + encodeURIComponent(host) + "&sz=64";
+      else logo.remove();
+    });
+
+    logo.src = "https://" + host + "/favicon.ico";
+    link.prepend(logo);
+  });
+}
+
 async function processMessage() {
   if (busy) return;
 
@@ -683,6 +711,7 @@ async function processMessage() {
         const el = document.querySelector(`[data-message-id="${live.id}"] .message-content`);
         if (el) {
           el.innerHTML = renderMarkdown(text);
+          decorateSources(el);
           $("#chatArea").scrollTop = $("#chatArea").scrollHeight;
         }
       }

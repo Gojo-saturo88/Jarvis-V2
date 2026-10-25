@@ -10,7 +10,7 @@ A mobile-friendly AI assistant built with HTML, CSS and JavaScript. AI runs thro
 - **Internet-first mode (Settings, on by default):** almost every question is searched on the web first. Wikipedia sources are collected, live web search runs, and the AI only writes the final answer from them, always ending with a Sources line. Only greetings, creative/code writing, translation and rewriting stay AI-only. Settings shows what share of your answers used the internet.
 - Fresh answers: today's date is given to the AI, and questions about anything that changes (news, office holders, prices, sports, versions) use live web search with a Sources line. If live search is unavailable, the answer is labelled and marked as possibly out of date.
 - Web search button forces live search for any question
-- Every answer is labelled: Internet, Internet + AI, or AI
+- Every answer is labelled: Internet, Internet + AI, AI, or On your device. Each source button shows the site's logo (favicon).
 - Streaming replies, Regenerate, Edit your last question, Copy, Read aloud
 - Code blocks with Copy code, and a sandboxed Preview for HTML
 - Study assistant, voice input and spoken replies (where the browser supports them)
@@ -45,6 +45,7 @@ The model is set in one place: `AI_MODEL` at the top of `askAI` in `app.js` (cur
 
 ## Data and privacy
 - Chats and settings are stored only in your browser.
+- Source logos are loaded from each source site's own `/favicon.ico`, with Google's favicon service as a fallback.
 - Questions are sent to Puter (AI) or to public services (Open-Meteo, ExchangeRate-API, dictionaryapi.dev, Wikipedia) to get answers.
 - Voice input uses your browser's speech service, which may process audio online.
 - Do not store passwords, API keys or private information in this public repository.

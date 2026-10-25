@@ -15,4 +15,5 @@ Include what you found, how to reproduce it, and which browser or device you use
 - Chats, settings and the theme stay in your own browser (localStorage). Nothing is stored on a server by this project.
 - The app contains no passwords, tokens or API keys. Never add any to this public repository.
 - AI replies are produced through Puter.js, and simple lookups (weather, exchange rates, dictionary, Wikipedia) are fetched directly from public services. Your question text is sent to those services to get an answer.
+- Source logos are requested from the source site (or Google's favicon service as a fallback), which reveals the site's domain to that service.
 - Replies are shown as escaped text with a small safe formatter. HTML previews run inside a sandboxed frame.
