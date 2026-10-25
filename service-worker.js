@@ -1,12 +1,14 @@
 "use strict";
 
-const CACHE_NAME = "jarvis-2-shell-v4";
+const CACHE_NAME = "jarvis-2-shell-v5";
 
 const APP_FILES = [
   "./",
   "./index.html",
   "./style.css",
   "./app.js",
+  "./extras.js",
+  "./extras.css",
   "./manifest.json",
   "./assets/icon.svg",
   "./assets/icon-192.png"

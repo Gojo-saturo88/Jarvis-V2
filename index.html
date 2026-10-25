@@ -8,6 +8,7 @@
   <meta name="description" content="JARVIS AI — your intelligent assistant">
   <title>JARVIS AI</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="extras.css">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
@@ -134,10 +135,16 @@
 
       <footer class="composer-area">
         <div class="composer" id="composer">
+          <div class="slash-menu hidden" id="slashMenu" role="listbox" aria-label="Commands"></div>
+          <div class="attach-chip hidden" id="attachChip"><span id="attachName"></span><button type="button" id="attachRemove" aria-label="Remove photo">&times;</button></div>
+          <input type="file" id="photoInput" accept="image/*" hidden>
           <textarea id="promptInput" rows="1" placeholder="Message JARVIS..." aria-label="Message JARVIS"></textarea>
           <div class="composer-bottom">
             <div class="composer-tools">
               <button class="tool-btn" id="webMode" title="Prefer web search"><span>⌕</span> <span>Web search</span></button>
+              <button class="tool-btn" id="photoBtn" title="Ask about a photo"><span>&#9707;</span> <span>Photo</span></button>
+              <button class="tool-btn" id="imageMode" title="Create an image"><span>&#10022;</span> <span>Image</span></button>
+              <button class="tool-btn stop-btn hidden" id="stopBtn" title="Stop answering"><span>&#9632;</span> <span>Stop</span></button>
               <button class="tool-btn" id="attachMode" title="Study assistant"><span>＋</span> <span>Study</span></button>
             </div>
             <div class="send-tools">
@@ -177,6 +184,24 @@
         <p id="netStats" class="net-stats"></p>
       </div>
       <div class="settings-section">
+        <h3>Strict internet mode</h3>
+        <p>Search the web for every question, including writing and code. Only simple greetings stay AI-only. This pushes the internet share close to 99%.</p>
+        <label class="switch-row"><span>Strict internet mode</span><input type="checkbox" id="strictSetting"></label>
+      </div>
+      <div class="settings-section">
+        <h3>Personalize</h3>
+        <p>Tell JARVIS what to call you and how to answer. Saved only in this browser.</p>
+        <input type="text" id="customNick" class="field" maxlength="30" placeholder="Your name (optional)" aria-label="Your name">
+        <textarea id="customStyle" class="field" rows="3" maxlength="400" placeholder="Style, e.g. Reply in Hinglish, keep answers short" aria-label="Custom instructions"></textarea>
+        <div class="swatches" id="swatches" aria-label="Accent colour"></div>
+      </div>
+      <div class="settings-section">
+        <h3>Backup</h3>
+        <p>Download all chats as a file, or restore them on another device.</p>
+        <div class="row-btns"><button class="primary-btn ghost-btn" id="backupBtn" type="button">Download backup</button><button class="primary-btn ghost-btn" id="restoreBtn" type="button">Restore backup</button></div>
+        <input type="file" id="restoreInput" accept="application/json,.json" hidden>
+      </div>
+      <div class="settings-section">
         <h3>AI and web search</h3>
         <p>Web search uses the supported Puter AI search tool when available. Internet access and service availability are required.</p>
       </div>
@@ -193,5 +218,6 @@
 
   <div class="toast" id="toast"></div>
   <script src="app.js"></script>
+  <script src="extras.js"></script>
 </body>
 </html>

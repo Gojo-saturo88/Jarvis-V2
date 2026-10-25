@@ -11,6 +11,12 @@ A mobile-friendly AI assistant built with HTML, CSS and JavaScript. AI runs thro
 - Fresh answers: today's date is given to the AI, and questions about anything that changes (news, office holders, prices, sports, versions) use live web search with a Sources line. If live search is unavailable, the answer is labelled and marked as possibly out of date.
 - Web search button forces live search for any question
 - Every answer is labelled: Internet, Internet + AI, AI, or On your device. Each source button shows the site's logo (favicon).
+- **Strict internet mode** (Settings): searches the web for every question except simple greetings, pushing the internet share close to 99%. Settings shows the real percentage.
+- More direct internet answers with no AI: crypto prices (CoinGecko), country facts (REST Countries), top tech stories (Hacker News), time in any city, plus weather, exchange rates, word meanings and the calculator
+- Photo questions (attach a photo and ask about it) and image creation (/image or the Image button)
+- Slash commands: /image /search /study /summarize /explain /translate /new /clear /help
+- Stop button, richer answers (tables, numbered lists, quotes), pin and rename chats
+- Personalize: your name, custom style instructions and accent colour. Backup and restore of all chats.
 - Streaming replies, Regenerate, Edit your last question, Copy, Read aloud
 - Code blocks with Copy code, and a sandboxed Preview for HTML
 - Study assistant, voice input and spoken replies (where the browser supports them)
@@ -22,7 +28,9 @@ A mobile-friendly AI assistant built with HTML, CSS and JavaScript. AI runs thro
 Jarvis-V2/
 ├── index.html
 ├── style.css
-├── app.js
+├── app.js          (core chat engine)
+├── extras.js       (new features, loaded after app.js)
+├── extras.css      (styles for the new features)
 ├── manifest.json
 ├── service-worker.js
 ├── SECURITY.md
@@ -44,7 +52,7 @@ Jarvis-V2/
 The model is set in one place: `AI_MODEL` at the top of `askAI` in `app.js` (currently `openai/gpt-5.6-luna`, the Puter model that supports the web search tool). Change it there if you want a different or cheaper model.
 
 ## Data and privacy
-- Chats and settings are stored only in your browser.
+- Chats, generated images (compressed), notes of your style and settings are stored only in your browser. Photos you attach are sent for that question only and are not saved.
 - Source logos are loaded from each source site's own `/favicon.ico`, with Google's favicon service as a fallback.
 - Questions are sent to Puter (AI) or to public services (Open-Meteo, ExchangeRate-API, dictionaryapi.dev, Wikipedia) to get answers.
 - Voice input uses your browser's speech service, which may process audio online.
@@ -54,6 +62,8 @@ The model is set in one place: `AI_MODEL` at the top of `askAI` in `app.js` (cur
 - AI features need internet and a working Puter.js session.
 - Internet lookups work best in English (Hindi Wikipedia is used for Devanagari text).
 - Voice features depend on browser support and permissions.
+- Generated images are saved compressed in your browser; if storage fills up, download a backup and clear old chats.
+- The extra direct sources (CoinGecko, REST Countries, Hacker News) are free public services and may rate-limit or change.
 - Offline mode only keeps the app shell. The AI does not work offline.
 
 ## Built with

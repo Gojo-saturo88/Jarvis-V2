@@ -187,6 +187,7 @@ function renderMessages() {
       actions = `<div class="message-actions">
         <button data-action="copy" data-id="${message.id}">Copy</button>
         <button data-action="speak" data-id="${message.id}">Read aloud</button>
+        ${message.image ? `<button data-action="saveimg" data-id="${message.id}">Save image</button>` : ""}
         ${message === lastAssistant && !busy ? `<button data-action="regen" data-id="${message.id}">Regenerate</button>` : ""}
       </div>`;
     } else if (message === lastUser && !busy) {
@@ -197,7 +198,7 @@ function renderMessages() {
       <div class="message-avatar">${avatar}</div>
       <div class="message-main">
         <div class="message-label">${roleLabel}${badge}<time>${time}</time></div>
-        <div class="message-content">${content}</div>
+        <div class="message-content">${content}${message.image && String(message.image).startsWith("data:image/") ? `<img class="gen-image" src="${message.image}" alt="Generated image">` : ""}</div>
         ${actions}
       </div>
     </article>`;
@@ -490,12 +491,15 @@ async function askAI(question, history, useWeb, opts = {}) {
   let searched = useWeb;
 
   try {
-    if (!useWeb && typeof opts.onText === "function") {
+    if (opts.image) {
+      response = await puter.ai.chat(buildSystemPrompt(false) + "\n\n" + question, opts.image, { model: AI_MODEL });
+    } else if (!useWeb && typeof opts.onText === "function") {
       const stream = await puter.ai.chat(messages, { model: AI_MODEL, stream: true });
       if (stream && stream[Symbol.asyncIterator]) {
         let acc = "";
         for await (const part of stream) {
           if (part && part.type === "error") throw new Error(part.message || "The AI stream failed.");
+          if (window.jarvisStop) break;
           if (part && part.text) { acc += part.text; opts.onText(acc); }
         }
         response = { message: { content: acc } };
@@ -625,8 +629,14 @@ async function processMessage() {
   if (busy) return;
 
   const input = $("#promptInput");
-  const question = input.value.trim();
+  let question = input.value.trim();
   if (!question) return;
+
+  if (window.jarvisHooks && typeof window.jarvisHooks.beforeSend === "function") {
+    const hooked = await window.jarvisHooks.beforeSend(question);
+    if (hooked === true) return;
+    if (typeof hooked === "string" && hooked.trim()) question = hooked.trim();
+  }
 
   const localAnswer = tryLocalCommand(question);
 
@@ -644,14 +654,19 @@ async function processMessage() {
     content: message.content
   }));
 
+  const imageFile = window.jarvisImage || null;
+  window.jarvisImage = null;
+  if (window.jarvisHooks && typeof window.jarvisHooks.imageSent === "function") window.jarvisHooks.imageSent();
+  window.jarvisStop = false;
+
   input.value = "";
   autoResizeInput();
-  addMessage("user", question);
+  addMessage("user", imageFile ? question + "\n\n[Photo attached: " + imageFile.name + "]" : question);
 
   busy = true;
   const forcedWeb = forceWebSearch;
-  const internetOn = internetFirstOn() && wantsInternet(question);
-  const useWeb = forceWebSearch || isLikelyCurrentInfo(question) || internetOn;
+  const internetOn = !imageFile && internetFirstOn() && wantsInternet(question);
+  const useWeb = !imageFile && (forceWebSearch || isLikelyCurrentInfo(question) || internetOn);
   const wasStudyMode = studyMode;
 
   setThinking(true, useWeb);
@@ -673,7 +688,7 @@ async function processMessage() {
   let fallbackText = null;
 
   try {
-    if (!wasStudyMode && !forcedWeb) {
+    if (!wasStudyMode && !forcedWeb && !imageFile) {
       try { hit = await netAnswer(question, internetOn || isLikelyCurrentInfo(question)); } catch { hit = null; }
     }
 
@@ -717,7 +732,7 @@ async function processMessage() {
       }
     };
 
-    const result = await askAI(aiPrompt, priorHistory, useWeb, { onText });
+    const result = await askAI(aiPrompt, priorHistory, useWeb, { onText, image: imageFile });
 
     if (links.length && !/sources?:/i.test(result.answer)) result.answer += "\n\nSources: " + links.join(" ");
     if (useWeb && !context && !result.searched) finalSrc = "ai";
